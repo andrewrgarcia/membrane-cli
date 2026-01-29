@@ -1,6 +1,6 @@
 <!-- LOGO -->
 <p align="center">
-  <img src="./assets/membrane.png" width="160" alt="Membrane icon"/>
+  <img width="200" alt="membrane" src="https://github.com/user-attachments/assets/d9b8e51e-1cbb-4e89-8d91-975c64fa5aea" />
 </p>
 
 <h1 align="center">Membrane</h1>
