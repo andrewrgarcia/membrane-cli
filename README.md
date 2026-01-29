@@ -6,7 +6,7 @@
 <h1 align="center">Membrane</h1>
 
 <p align="center">
-  <a href="https://crates.io/crates/mem">
+  <a href="https://crates.io/crates/membrane-cli">
     <img src="https://img.shields.io/crates/v/mem.svg" />
   </a>
 </p>
