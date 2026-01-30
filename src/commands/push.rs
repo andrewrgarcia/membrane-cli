@@ -79,7 +79,7 @@ fn push_project(
     project_name: &str,
     source: &str,
 ) -> Result<()> {
-    let root = memfs::find_membrane_root()?;
+    let root = memfs::resolve_workspace_root()?;
     let dest = memfs::projects_dir(&root)
         .join(format!("{}.yaml", project_name));
 

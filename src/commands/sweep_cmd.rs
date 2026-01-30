@@ -5,7 +5,7 @@ use crate::{memfs, sweep};
 use crate::utils::table::render_table;
 
 pub fn run(similar: bool) -> Result<()> {
-    let root = memfs::find_membrane_root()?;
+    let root = memfs::resolve_workspace_root()?;
     let dir = memfs::projects_dir(&root);
 
     if similar {

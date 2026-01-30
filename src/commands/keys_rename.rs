@@ -10,7 +10,7 @@ pub fn run(old: &str, new: &str, project_filter: Option<&str>) -> Result<()> {
         anyhow::bail!("Old key and new key are identical");
     }
 
-    let root = memfs::find_membrane_root()?;
+    let root = memfs::resolve_workspace_root()?;
     let projects_dir = memfs::projects_dir(&root);
 
     println!("Renaming key `{}` → `{}`", old, new);

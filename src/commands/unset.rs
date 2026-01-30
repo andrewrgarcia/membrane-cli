@@ -11,7 +11,7 @@ pub fn run(project: &str, key: &str) -> Result<()> {
         anyhow::bail!("Refusing to delete reserved metadata key `{}`", key);
     }
 
-    let root = memfs::find_membrane_root()?;
+    let root = memfs::resolve_workspace_root()?;
     let path = memfs::projects_dir(&root).join(format!("{project}.yaml"));
 
     if !path.exists() {

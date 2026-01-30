@@ -6,3 +6,6 @@ pub mod unset;
 pub mod sweep_cmd;
 pub mod keys_rename;
 pub mod push;
+pub mod brane;
+pub mod checkout;
+pub mod register;

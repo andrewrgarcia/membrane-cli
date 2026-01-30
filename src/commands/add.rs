@@ -7,7 +7,7 @@ use crate::memfs;
 use crate::utils::time::now_iso;
 
 pub fn run(name: &str) -> Result<()> {
-    let root = memfs::find_membrane_root()?;
+    let root = memfs::resolve_workspace_root()?;
     let path = memfs::projects_dir(&root).join(format!("{name}.yaml"));
 
     if path.exists() {

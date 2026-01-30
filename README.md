@@ -18,7 +18,7 @@
 It lets you name projects, attach arbitrary keys, and observe how language
 emerges across your work — without enforcing structure, schemas, or workflows.
 
-Membrane is not a task manager, calendar, or ticketing system.
+Membrane is not a task manager, calendar, or ticketing system.  
 It sits *above* those tools, acting as a lightweight semantic layer
 over your projects.
 
@@ -44,14 +44,26 @@ You decide what matters. Membrane just remembers it.
 
 ## Core Concepts
 
-- **Workspace-based**  
-  A Membrane workspace lives in a `.membrane/` directory.
+- **Workspace-based (globally staged)**  
+  A Membrane workspace ("brane") lives in a `.membrane/` directory and can be
+  staged globally for use from anywhere on your system.
+
+- **Global workspace registry**  
+  Membrane maintains a lightweight global index of known workspaces
+  and tracks which one is currently active.
+
+- **Explicit workspace switching**  
+  Commands operate on the *active workspace*, not the current directory.
 
 - **Projects are YAML files**  
   Each project is a single, human-readable YAML file.
 
 - **Schema-less by design**  
   Projects can contain any keys. No required fields.
+
+- **Stable project identity**  
+  Each project is assigned a unique internal ID, allowing projects
+  to be referenced by name or by ID prefix.
 
 - **Keys are first-class**  
   Keys can be added, renamed, deleted, and inspected across projects.
@@ -66,7 +78,7 @@ You decide what matters. Membrane just remembers it.
 
 ```bash
 cargo install membrane-cli
-```
+````
 
 This installs the `me` command.
 
@@ -80,9 +92,37 @@ This installs the `me` command.
 me init
 ```
 
-Creates a `.membrane/` directory in the current folder.
+Creates a `.membrane/` directory in the current folder and assigns it
+a stable workspace ID.
 
 ---
+
+### Register and inspect workspaces
+
+```bash
+me brane
+```
+
+Lists all known Membrane workspaces ("Branes") on your system.
+The active workspace is marked with `*`.
+
+---
+
+### Switch active workspace
+
+```bash
+me checkout <id-prefix>
+```
+
+Switches the active workspace using a leading ID prefix
+(similar to `git checkout`).
+
+Once switched, **all commands operate on the active workspace**
+regardless of your current directory.
+
+---
+
+## Working with Projects
 
 ### Create a project
 
@@ -100,7 +140,9 @@ Creates a new project file with basic metadata.
 me show
 ```
 
-Displays all projects in the current workspace.
+Displays all projects in the active workspace.
+
+Each project is shown with its short ID for quick reference.
 
 ---
 
@@ -108,9 +150,12 @@ Displays all projects in the current workspace.
 
 ```bash
 me show my-project
+me show a43b21
 ```
 
 Displays all keys and values for the project.
+Projects can be referenced by name or by ID prefix.
+
 Metadata keys (prefixed with `_`) are visually dimmed.
 
 ---
@@ -161,6 +206,7 @@ me push
 ```
 
 Paste YAML content directly into the terminal to create a project.
+An ID is automatically assigned if one is not present.
 
 ---
 
@@ -222,7 +268,8 @@ Membrane follows semantic versioning.
 
 * **0.1.x** establishes the conceptual and architectural core.
 * **0.2.x** adds inspection, mutation, and sorting capabilities.
-* Future versions will extend views and filters
+* **0.3.x** introduces globally staged workspaces and explicit workspace switching.
+* Future versions will extend views and navigation
   without breaking existing project files.
 
 ---
