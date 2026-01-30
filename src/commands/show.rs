@@ -63,18 +63,40 @@ fn show_all(
     }
 
     for (name, project) in projects {
+        let id_suffix = project
+            .get("_id")
+            .and_then(|v| v.as_str())
+            .map(|s| format!("[{}]", &s[..8]).dimmed())
+            .unwrap_or_else(|| "".normal());
+
+        // ── SORTED CASE ───────────────────────────────
         if let Some(k) = show_key {
-            if let Some(val) = project.get(k).and_then(render_inline_value) {
-                println!("• {:<20} {}: {}", name, k.dimmed(), val.dimmed());
-                continue;
-            }
+            let val = project
+                .get(k)
+                .and_then(render_inline_value)
+                .unwrap_or_else(|| "—".into());
+
+            println!(
+                "• {:<20} {}: {:<20} {}",
+                name,
+                k.dimmed(),
+                val.dimmed(),
+                id_suffix
+            );
+            continue;
         }
 
-        println!("• {}", name);
+        // ── UNSORTED CASE ─────────────────────────────
+        println!(
+            "• {:<20} {}",
+            name,
+            id_suffix
+        );
     }
 
     Ok(())
 }
+
 
 fn render_inline_value(value: &serde_yaml::Value) -> Option<String> {
     match value {
@@ -97,15 +119,12 @@ fn render_inline_value(value: &serde_yaml::Value) -> Option<String> {
 // Show single project
 // ------------------------------------------------------------
 
-fn show_single(dir: &Path, name: &str) -> Result<()> {
-    let path = dir.join(format!("{name}.yaml"));
 
-    if !path.exists() {
-        anyhow::bail!("Project not found: {name}");
-    }
 
-    let content = fs::read_to_string(&path)?;
-    let project: Project = serde_yaml::from_str(&content)?;
+use crate::utils::resolve::resolve_project;
+
+fn show_single(dir: &Path, input: &str) -> Result<()> {
+    let (name, project) = resolve_project(dir, input)?;
 
     println!(
         "{}",
@@ -120,7 +139,9 @@ fn show_single(dir: &Path, name: &str) -> Result<()> {
             | Value::Number(_)
             | Value::String(_)
             | Value::Null => {
-                let rendered = serde_yaml::to_string(&value)?.trim().to_string();
+                let rendered = serde_yaml::to_string(&value)?
+                    .trim()
+                    .to_string();
                 let (k, v) = render_key_value(&key, &rendered);
                 println!("{k}: {v}");
             }
@@ -139,6 +160,7 @@ fn show_single(dir: &Path, name: &str) -> Result<()> {
 
     Ok(())
 }
+
 
 // ------------------------------------------------------------
 // Load + sort helpers
@@ -162,13 +184,23 @@ fn load_projects(dir: &Path) -> Result<Vec<(String, Project)>> {
             .to_string();
 
         let content = fs::read_to_string(&path)?;
-        let project: Project = serde_yaml::from_str(&content)?;
+        let mut project: Project = serde_yaml::from_str(&content)?;
+
+        // BACKFILL ID IF MISSING
+        if !project.contains_key("_id") {
+            let new_id = uuid::Uuid::new_v4().to_string();
+            project.insert("_id".to_string(), Value::String(new_id));
+
+            // persist immediately
+            fs::write(&path, serde_yaml::to_string(&project)?)?;
+        }
 
         out.push((name, project));
     }
 
     Ok(out)
 }
+
 
 fn sort_projects(
     projects: &mut Vec<(String, Project)>,

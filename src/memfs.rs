@@ -1,5 +1,6 @@
 use anyhow::{Result, Context};
 use std::{fs, path::PathBuf};
+use uuid::Uuid;
 
 pub fn find_membrane_root() -> Result<PathBuf> {
     let mut dir = std::env::current_dir()?;
@@ -28,7 +29,13 @@ pub fn init_membrane() -> Result<()> {
     fs::create_dir_all(&projects)
         .with_context(|| "Failed to create .membrane/projects")?;
 
-    fs::write(membrane.join("config.yaml"), "version: 0.1\n")?;
+    // --- membrane ID (stable)
+    let id_path = membrane.join("id");
+    if !id_path.exists() {
+        fs::write(&id_path, Uuid::new_v4().to_string())?;
+    }
+
+    fs::write(membrane.join("config.yaml"), "version: 0.2\n")?;
 
     println!("Initialized Membrane in {}", root.display());
     Ok(())

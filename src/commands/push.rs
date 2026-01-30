@@ -90,6 +90,13 @@ fn push_project(
         );
     }
 
+    if !data.contains_key("_id") {
+        data.insert(
+            "_id".to_string(),
+            Value::String(uuid::Uuid::new_v4().to_string()),
+        );
+    }
+
     // --- inject metadata
     let now = now_iso();
     data.insert("_created".to_string(), Value::String(now.clone()));
