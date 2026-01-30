@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://crates.io/crates/membrane-cli">
-    <img src="https://img.shields.io/crates/v/mem.svg" />
+    <img src="https://img.shields.io/crates/v/membrane-cli.svg" />
   </a>
 </p>
 
@@ -54,8 +54,7 @@ You decide what matters. Membrane just remembers it.
   Projects can contain any keys. No required fields.
 
 - **Keys are first-class**  
-  Membrane can analyze keys across projects to reveal patterns,
-  inconsistencies, or duplication.
+  Keys can be added, renamed, deleted, and inspected across projects.
 
 - **Metadata is explicit**  
   Reserved keys (prefixed with `_`) track creation and update times
@@ -66,16 +65,10 @@ You decide what matters. Membrane just remembers it.
 ## Installation
 
 ```bash
-cargo install mem
+cargo install membrane-cli
 ```
 
-Or clone and build locally:
-
-```bash
-git clone https://github.com/yourname/membrane
-cd membrane
-cargo build --release
-```
+This installs the `me` command.
 
 ---
 
@@ -84,7 +77,7 @@ cargo build --release
 ### Initialize a workspace
 
 ```bash
-mem init
+me init
 ```
 
 Creates a `.membrane/` directory in the current folder.
@@ -94,7 +87,7 @@ Creates a `.membrane/` directory in the current folder.
 ### Create a project
 
 ```bash
-mem add my-project
+me add my-project
 ```
 
 Creates a new project file with basic metadata.
@@ -104,7 +97,7 @@ Creates a new project file with basic metadata.
 ### List projects
 
 ```bash
-mem show
+me show
 ```
 
 Displays all projects in the current workspace.
@@ -114,7 +107,7 @@ Displays all projects in the current workspace.
 ### Show a project
 
 ```bash
-mem show my-project
+me show my-project
 ```
 
 Displays all keys and values for the project.
@@ -122,10 +115,22 @@ Metadata keys (prefixed with `_`) are visually dimmed.
 
 ---
 
+### Sort projects by a key
+
+```bash
+me show --sort status
+me show --sort _updated --desc
+```
+
+When sorting is enabled, the selected key and its value
+are shown inline for each project (when present).
+
+---
+
 ### Set a key
 
 ```bash
-mem set my-project description "Initial prototype"
+me set my-project description "Initial prototype"
 ```
 
 Values are parsed as YAML scalars when possible.
@@ -135,7 +140,7 @@ Values are parsed as YAML scalars when possible.
 ### Set a multi-line value (interactive)
 
 ```bash
-mem set my-project notes
+me set my-project notes
 ```
 
 You’ll be prompted to paste or type content directly into the terminal.
@@ -143,26 +148,51 @@ Finish with `Ctrl+D` (Linux/macOS) or `Ctrl+Z` + Enter (Windows).
 
 ---
 
+### Push a project from YAML
+
+```bash
+me push roadmap.yaml
+```
+
+Or interactively:
+
+```bash
+me push
+```
+
+Paste YAML content directly into the terminal to create a project.
+
+---
+
 ### Inspect keys across projects
 
 ```bash
-mem keys
+me keys
 ```
 
 Lists all keys and how frequently they appear.
 
 ```bash
-mem keys --similar
+me keys --similar
 ```
 
 Highlights near-duplicate keys (e.g. `created_at` vs `created-at`).
 
 ---
 
+### Rename a key
+
+```bash
+me keys rename old_key new_key
+me keys rename status phase --project my-project
+```
+
+---
+
 ### Delete a project (safe)
 
 ```bash
-mem rm my-project
+me rm my-project
 ```
 
 You’ll be asked to confirm by typing the project name.
@@ -190,24 +220,10 @@ that you can reason about over time.
 
 Membrane follows semantic versioning.
 
-* **0.1.0** establishes the conceptual and architectural core.
-* Future versions will add capabilities incrementally
+* **0.1.x** establishes the conceptual and architectural core.
+* **0.2.x** adds inspection, mutation, and sorting capabilities.
+* Future versions will extend views and filters
   without breaking existing project files.
-
----
-
-## Roadmap (non-binding)
-
-Possible future additions:
-
-* Key renaming / edit-sweep
-* Key deletion
-* Archiving projects
-* Filters and views
-* Editor integration
-* JSON output modes
-
-None of these are required to use Membrane effectively.
 
 ---
 

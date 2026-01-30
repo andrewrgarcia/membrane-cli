@@ -1,46 +1,104 @@
-use anyhow::Result;
-use std::fs;
-
 use crate::core::Project;
 use crate::memfs;
 use crate::utils::render::render_key_value;
-use colored::Colorize;
 
-pub fn run(project: Option<&str>) -> Result<()> {
+use anyhow::Result;
+use colored::Colorize;
+use serde_yaml::Value;
+use std::cmp::Ordering;
+use std::fs;
+use std::path::Path;
+
+// ------------------------------------------------------------
+// Public entry
+// ------------------------------------------------------------
+
+pub fn run(
+    project: Option<&str>,
+    sort_key: Option<&str>,
+    desc: bool,
+) -> Result<()> {
+    let root = memfs::find_membrane_root()?;
+    let projects_dir = memfs::projects_dir(&root);
+
     match project {
-        Some(name) => show_project(name),
-        None => list_projects(),
+        Some(name) => show_single(&projects_dir, name),
+        None => show_all(&projects_dir, sort_key, desc),
     }
 }
 
-// ---------- internal ----------
+// ------------------------------------------------------------
+// List projects (optionally sorted)
+// ------------------------------------------------------------
 
-fn list_projects() -> Result<()> {
-    let root = memfs::find_membrane_root()?;
-    let mut projects = Vec::new();
+fn show_all(
+    dir: &Path,
+    sort_key: Option<&str>,
+    desc: bool,
+) -> Result<()> {
+    let mut projects = load_projects(dir)?;
 
-    for entry in fs::read_dir(memfs::projects_dir(&root))? {
-        let entry = entry?;
-        if let Some(name) = entry.path().file_stem() {
-            projects.push(name.to_string_lossy().to_string());
-        }
+    if let Some(key) = sort_key {
+        sort_projects(&mut projects, key, desc);
     }
 
-    projects.sort();
+    let show_key = sort_key.and_then(|k| {
+        projects.iter().any(|(_, p)| p.contains_key(k)).then_some(k)
+    });
 
-    println!("{}", "=== Projects ===".bright_purple().bold());
+    if let Some(k) = show_key {
+        println!(
+            "{}",
+            format!("=== Projects (sorted by {}) ===", k)
+                .truecolor(255, 105, 180)
+                .bold()
+        );
+    } else {
+        println!(
+            "{}",
+            "=== Projects ==="
+                .truecolor(255, 105, 180)
+                .bold()
+        );
+    }
 
-    for name in projects {
+    for (name, project) in projects {
+        if let Some(k) = show_key {
+            if let Some(val) = project.get(k).and_then(render_inline_value) {
+                println!("• {:<20} {}: {}", name, k.dimmed(), val.dimmed());
+                continue;
+            }
+        }
+
         println!("• {}", name);
     }
 
     Ok(())
 }
 
+fn render_inline_value(value: &serde_yaml::Value) -> Option<String> {
+    match value {
+        serde_yaml::Value::Bool(_)
+        | serde_yaml::Value::Number(_)
+        | serde_yaml::Value::String(_)
+        | serde_yaml::Value::Null => {
+            Some(
+                serde_yaml::to_string(value)
+                    .ok()?
+                    .trim()
+                    .to_string()
+            )
+        }
+        _ => None, // sequences / maps are too noisy inline
+    }
+}
 
-fn show_project(name: &str) -> Result<()> {
-    let root = memfs::find_membrane_root()?;
-    let path = memfs::projects_dir(&root).join(format!("{name}.yaml"));
+// ------------------------------------------------------------
+// Show single project
+// ------------------------------------------------------------
+
+fn show_single(dir: &Path, name: &str) -> Result<()> {
+    let path = dir.join(format!("{name}.yaml"));
 
     if !path.exists() {
         anyhow::bail!("Project not found: {name}");
@@ -49,13 +107,99 @@ fn show_project(name: &str) -> Result<()> {
     let content = fs::read_to_string(&path)?;
     let project: Project = serde_yaml::from_str(&content)?;
 
-    println!("— {name} —");
+    println!(
+        "{}",
+        format!("— {} —", name)
+            .truecolor(255, 105, 180)
+            .bold()
+    );
 
     for (key, value) in project {
-        let rendered_val = serde_yaml::to_string(&value)?.trim().to_string();
-        let (k, v) = render_key_value(&key, &rendered_val);
-        println!("{k}: {v}");
+        match value {
+            Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Null => {
+                let rendered = serde_yaml::to_string(&value)?.trim().to_string();
+                let (k, v) = render_key_value(&key, &rendered);
+                println!("{k}: {v}");
+            }
+
+            // sequences and mappings
+            _ => {
+                let (k, _) = render_key_value(&key, "");
+                println!("{k}:");
+                let rendered = serde_yaml::to_string(&value)?;
+                for line in rendered.lines() {
+                    println!("  {}", line);
+                }
+            }
+        }
     }
 
     Ok(())
 }
+
+// ------------------------------------------------------------
+// Load + sort helpers
+// ------------------------------------------------------------
+
+fn load_projects(dir: &Path) -> Result<Vec<(String, Project)>> {
+    let mut out = Vec::new();
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.extension().and_then(|s| s.to_str()) != Some("yaml") {
+            continue;
+        }
+
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap()
+            .to_string();
+
+        let content = fs::read_to_string(&path)?;
+        let project: Project = serde_yaml::from_str(&content)?;
+
+        out.push((name, project));
+    }
+
+    Ok(out)
+}
+
+fn sort_projects(
+    projects: &mut Vec<(String, Project)>,
+    key: &str,
+    desc: bool,
+) {
+    projects.sort_by(|a, b| {
+        let va = a.1.get(key);
+        let vb = b.1.get(key);
+
+        let ord = compare_yaml_values(va, vb);
+        if desc { ord.reverse() } else { ord }
+    });
+}
+
+fn compare_yaml_values(a: Option<&Value>, b: Option<&Value>) -> Ordering {
+    match (a, b) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Greater,
+        (Some(_), None) => Ordering::Less,
+
+        (Some(Value::Number(a)), Some(Value::Number(b))) =>
+            a.as_f64()
+                .partial_cmp(&b.as_f64())
+                .unwrap_or(Ordering::Equal),
+
+        (Some(Value::String(a)), Some(Value::String(b))) =>
+            a.cmp(b),
+
+        (Some(a), Some(b)) =>
+            format!("{a:?}").cmp(&format!("{b:?}")),
+    }
+}
+

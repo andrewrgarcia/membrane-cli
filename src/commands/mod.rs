@@ -2,4 +2,7 @@ pub mod add;
 pub mod delete;
 pub mod show;
 pub mod set;
+pub mod unset;
 pub mod sweep_cmd;
+pub mod keys_rename;
+pub mod push;

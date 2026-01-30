@@ -20,6 +20,17 @@ struct Cli {
     command: Commands,
 }
 
+#[derive(Subcommand)]
+enum KeysAction {
+    Rename {
+        old: String,
+        new: String,
+
+        #[arg(long)]
+        project: Option<String>,
+    },
+}
+
 
 #[derive(Subcommand)]
 enum Commands {
@@ -27,16 +38,28 @@ enum Commands {
     Add { name: String },
     Show {
         project: Option<String>,
+
+        #[arg(long)]
+        sort: Option<String>,
+
+        #[arg(long)]
+        desc: bool,
     },
-    Set {
-        project: String,
-        key: String,
-        value: Option<String>,
-    },
+    Set { project: String, key: String, value: Option<String> },
+    Unset { project: String, key: String },
     Rm { project: String },
     Keys {
+        #[command(subcommand)]
+        action: Option<KeysAction>,
+
         #[arg(long)]
         similar: bool,
+    },
+    Push {
+        file: Option<String>,
+
+        #[arg(long)]
+        as_name: Option<String>,
     },
 }
 
@@ -75,13 +98,27 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Init => memfs::init_membrane(),
         Commands::Add { name } => commands::add::run(&name),
-        Commands::Show { project } =>
-            commands::show::run(project.as_deref()),
+        Commands::Show { project, sort, desc } =>
+            commands::show::run(
+                project.as_deref(),
+                sort.as_deref(),
+                desc,
+            ),
         Commands::Set { project, key, value } =>
             commands::set::run(&project, &key, value.as_deref()),
+        Commands::Unset { project, key } =>
+            commands::unset::run(&project, &key),
         Commands::Rm { project } =>
             commands::delete::run(&project),
-        Commands::Keys { similar } =>
-            commands::sweep_cmd::run(similar),
+        Commands::Keys { action, similar } => {
+            match action {
+                Some(KeysAction::Rename { old, new, project }) =>
+                    commands::keys_rename::run(&old, &new, project.as_deref()),
+                None =>
+                    commands::sweep_cmd::run(similar),
+            }
+        },
+        Commands::Push { file, as_name } =>
+            commands::push::run(file.as_deref(), as_name.as_deref()),
     }
 }

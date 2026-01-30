@@ -1,7 +1,8 @@
 [package]
 name = "membrane-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+authors = ["Andrew Garcia"]
 description = "Schema-optional, file-based project memory system"
 license = "MIT"
 repository = "https://github.com/andrewrgarcia/membrane-cli"
@@ -18,5 +19,5 @@ colored = "2.1"
 anstyle = "1.0"
 
 [[bin]]
-name = "mem"
+name = "me"
 path = "src/main.rs"
