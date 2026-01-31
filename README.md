@@ -144,6 +144,18 @@ Displays all projects in the active workspace.
 
 Each project is shown with its short ID for quick reference.
 
+#### Filtered and printable views
+
+```bash
+me show --sort status
+me show --sort status --only
+```
+
+* `--sort <key>` orders projects by a given key
+* `--only` hides projects that do not define the sorted key
+
+This allows focused views without placeholder entries.
+
 ---
 
 ### Show a project
@@ -169,6 +181,23 @@ me show --sort _updated --desc
 
 When sorting is enabled, the selected key and its value
 are shown inline for each project (when present).
+
+### Export project views (printable)
+
+```bash
+me show --printed
+me show --sort status --only --printed
+```
+
+* `--printed` exports the current view to a clean markdown file
+* Output is written to `BRANE_<id>.md`
+* The export includes:
+
+  * Active workspace context
+  * Project index (respecting `--sort` and `--only`)
+  * Full contents of each listed project
+
+Printed output is ANSI-free and suitable for version control or sharing.
 
 ---
 
@@ -269,8 +298,8 @@ Membrane follows semantic versioning.
 * **0.1.x** establishes the conceptual and architectural core.
 * **0.2.x** adds inspection, mutation, and sorting capabilities.
 * **0.3.x** introduces globally staged workspaces and explicit workspace switching.
+* **0.4.x** adds printable views and key-aware filtering.
 * Future versions will extend views and navigation
-  without breaking existing project files.
 
 ---
 
