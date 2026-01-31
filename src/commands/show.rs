@@ -3,6 +3,7 @@ use crate::memfs;
 use crate::global;
 use crate::utils::render::render_key_value;
 use crate::utils::resolve::resolve_project;
+use crate::commands::show_model::ShowContext;
 
 use anyhow::Result;
 use colored::Colorize;
@@ -25,33 +26,37 @@ pub fn run(
     let root = memfs::resolve_workspace_root()?;
     let projects_dir = memfs::projects_dir(&root);
 
-    let mut out = Vec::<String>::new();
-
-    // ── Active brane header ────────────────────────────────
     let index = global::load_global_index();
+    let brane_id = index
+        .active
+        .clone()
+        .unwrap_or_else(|| "unknown".into());
 
-    if let Some(active_id) = &index.active {
-        let short = active_id.get(..8).unwrap_or(active_id);
-        out.push(format!(
-            "Active brane: {}  [{}]",
-            root.display(),
-            short
-        ));
+    let mut projects = load_projects(&projects_dir)?;
+
+    if let Some(k) = sort_key {
+        sort_projects(&mut projects, k, desc);
     }
 
-
-    match project {
-        Some(name) => show_single(&projects_dir, name, &mut out)?,
-        None => show_all(&projects_dir, sort_key, desc, only, &mut out)?,
+    if only {
+        if let Some(k) = sort_key {
+            projects.retain(|(_, p)| p.contains_key(k));
+        }
     }
 
-    // ── Emit ───────────────────────────────────────────────
-    for line in &out {
-        println!("{}", line);
-    }
+    let ctx = ShowContext {
+        brane_root: root.clone(),
+        brane_id,
+        sort_key: sort_key.map(|s| s.to_string()),
+        projects,
+    };
 
+    // --- CLI output (colored)
+    render_cli(&ctx, project)?;
+
+    // --- Markdown output (clean)
     if printed {
-        fs::write("SHOW.md", out.join("\n"))?;
+        render_markdown(&ctx)?;
     }
 
     Ok(())
@@ -61,79 +66,58 @@ pub fn run(
 // List projects
 // ------------------------------------------------------------
 
-fn show_all(
-    dir: &Path,
-    sort_key: Option<&str>,
-    desc: bool,
-    only: bool,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    let mut projects = load_projects(dir)?;
 
-    if let Some(key) = sort_key {
-        sort_projects(&mut projects, key, desc);
+fn render_cli(ctx: &ShowContext, project: Option<&str>) -> Result<()> {
+    let short = ctx.brane_id.chars().take(8).collect::<String>();
+
+    println!(
+        "{} {}  [{}]",
+        "Active brane:".dimmed(),
+        ctx.brane_root.display(),
+        short
+    );
+
+    match project {
+        Some(p) => render_single_cli(ctx, p),
+        None => render_list_cli(ctx),
     }
+}
 
-    let key_exists = sort_key.and_then(|k| {
-        projects.iter().any(|(_, p)| p.contains_key(k)).then_some(k)
-    });
-
-    // ── HEADER ────────────────────────────────────────────────
-    let header = match key_exists {
-        Some(k) => format!(
-            "=== Projects (sorted by {}) ===",
-            k.dimmed()
-        )
-        .truecolor(255, 105, 180)
-        .bold()
-        .to_string(),
-
-        None => "=== Projects ==="
-            .truecolor(255, 105, 180)
-            .bold()
-            .to_string(),
+fn render_list_cli(ctx: &ShowContext) -> Result<()> {
+    let header = match &ctx.sort_key {
+        Some(k) => format!("=== Projects (sorted by {}) ===", k),
+        None => "=== Projects ===".to_string(),
     };
 
-    out.push(header);
+    println!("{}", header.truecolor(255,105,180).bold());
 
-    // ── BODY ──────────────────────────────────────────────────
-    for (name, project) in projects {
-        // --only filtering
-        if let (true, Some(k)) = (only, key_exists) {
-            if !project.contains_key(k) {
-                continue;
-            }
-        }
-
+    for (name, project) in &ctx.projects {
         let id = project
             .get("_id")
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let short_id = id.get(..8).unwrap_or(id);
+        let short_id = id.chars().take(8).collect::<String>();
 
-        let name_col = name.bright_white();
-        let id_col = format!("[{}]", short_id).dimmed();
-
-        if let Some(k) = key_exists {
+        if let Some(k) = &ctx.sort_key {
             let val = project
                 .get(k)
                 .and_then(render_inline_value)
-                .unwrap_or_else(|| "—".into());
+                .unwrap_or("—".into());
 
-            out.push(format!(
+            println!(
                 "• {:<20} {}: {:<20} {}",
-                name_col,
+                name.bright_white(),
                 k.dimmed(),
                 val.dimmed(),
-                id_col
-            ));
+                format!("[{}]", short_id).dimmed()
+            );
         } else {
-            out.push(format!(
+            println!(
                 "• {:<20} {}",
-                name_col,
-                id_col
-            ));
+                name.bright_white(),
+                format!("[{}]", short_id).dimmed()
+            );
         }
     }
 
@@ -141,14 +125,16 @@ fn show_all(
 }
 
 
-// ------------------------------------------------------------
-// Single project
-// ------------------------------------------------------------
+fn render_single_cli(ctx: &ShowContext, input: &str) -> Result<()> {
+    let dir = memfs::projects_dir(&ctx.brane_root);
+    let (name, project) = resolve_project(&dir, input)?;
 
-fn show_single(dir: &Path, input: &str, out: &mut Vec<String>) -> Result<()> {
-    let (name, project) = resolve_project(dir, input)?;
-
-    out.push(format!("— {} —", name));
+    println!(
+        "{}",
+        format!("— {} —", name)
+            .truecolor(255,105,180)
+            .bold()
+    );
 
     for (key, value) in project {
         match value {
@@ -158,14 +144,14 @@ fn show_single(dir: &Path, input: &str, out: &mut Vec<String>) -> Result<()> {
             | Value::Null => {
                 let rendered = serde_yaml::to_string(&value)?.trim().to_string();
                 let (k, v) = render_key_value(&key, &rendered);
-                out.push(format!("{k}: {v}"));
+                println!("{k}: {v}");
             }
             _ => {
                 let (k, _) = render_key_value(&key, "");
-                out.push(format!("{k}:"));
+                println!("{k}:");
                 let rendered = serde_yaml::to_string(&value)?;
                 for line in rendered.lines() {
-                    out.push(format!("  {}", line));
+                    println!("  {}", line);
                 }
             }
         }
@@ -173,6 +159,89 @@ fn show_single(dir: &Path, input: &str, out: &mut Vec<String>) -> Result<()> {
 
     Ok(())
 }
+
+fn render_markdown(ctx: &ShowContext) -> Result<()> {
+    let mut md = String::new();
+    let short = ctx.brane_id.chars().take(8).collect::<String>();
+
+    md.push_str(&format!(
+        "> Active brane: {} [{}]\n\n",
+        ctx.brane_root.display(),
+        short
+    ));
+
+    let title = match &ctx.sort_key {
+        Some(k) => format!("# Projects (sorted by {})\n\n", k),
+        None => "# Projects\n\n".to_string(),
+    };
+
+    md.push_str(&title);
+
+    // --- Index
+    for (name, project) in &ctx.projects {
+        let id = project
+            .get("_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let short_id = id.chars().take(8).collect::<String>();
+
+        if let Some(k) = &ctx.sort_key {
+            let val = project
+                .get(k)
+                .and_then(render_inline_value)
+                .unwrap_or("—".into());
+
+            md.push_str(&format!(
+                "• {:<20} {}: {:<20} [{}]\n",
+                name, k, val, short_id
+            ));
+        } else {
+            md.push_str(&format!(
+                "• {:<20} [{}]\n",
+                name, short_id
+            ));
+        }
+    }
+
+    md.push_str("\n---\n\n");
+
+    // --- Full projects
+    for (name, project) in &ctx.projects {
+        md.push_str(&format!("## {}\n", name));
+
+        for (key, value) in project {
+            match value {
+                Value::Bool(_)
+                | Value::Number(_)
+                | Value::String(_)
+                | Value::Null => {
+                    md.push_str(&format!(
+                        "{}: {}\n",
+                        key,
+                        serde_yaml::to_string(value)?.trim()
+                    ));
+                }
+                _ => {
+                    md.push_str(&format!("{}:\n", key));
+                    let rendered = serde_yaml::to_string(value)?;
+                    for line in rendered.lines() {
+                        md.push_str(&format!("  {}\n", line));
+                    }
+                }
+            }
+        }
+
+        md.push('\n');
+    }
+
+    let filename = format!("BRANE_{}.md", short);
+    fs::write(&filename, md)?;
+
+    println!("✔ wrote {}", filename);
+
+    Ok(())
+}
+
 
 // ------------------------------------------------------------
 // Helpers

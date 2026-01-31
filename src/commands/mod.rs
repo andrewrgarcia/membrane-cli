@@ -1,6 +1,7 @@
 pub mod add;
 pub mod delete;
 pub mod show;
+pub mod show_model;
 pub mod set;
 pub mod unset;
 pub mod sweep_cmd;
