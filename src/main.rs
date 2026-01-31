@@ -34,6 +34,7 @@ enum KeysAction {
 #[derive(Subcommand)]
 enum Commands {
     Init,
+    Prune,
     Register,
     Brane,
     Checkout {
@@ -117,6 +118,9 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Init =>
             memfs::init_membrane(),
+
+        Commands::Prune =>
+            commands::prune::run(),
 
         Commands::Register => commands::register::run(),
         

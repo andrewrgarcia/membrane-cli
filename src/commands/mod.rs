@@ -10,3 +10,4 @@ pub mod push;
 pub mod brane;
 pub mod checkout;
 pub mod register;
+pub mod prune;
