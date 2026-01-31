@@ -50,6 +50,12 @@ enum Commands {
 
         #[arg(long)]
         desc: bool,
+
+        #[arg(long)]
+        printed: bool,
+
+        #[arg(long)]
+        only: bool,
     },
     Set {
         project: String,
@@ -123,11 +129,19 @@ fn main() -> Result<()> {
         Commands::Add { name } =>
             commands::add::run(&name),
 
-        Commands::Show { project, sort, desc } =>
+        Commands::Show {
+            project,
+            sort,
+            desc,
+            printed,
+            only,
+        } =>
             commands::show::run(
                 project.as_deref(),
                 sort.as_deref(),
                 desc,
+                printed,
+                only,
             ),
 
         Commands::Set { project, key, value } =>

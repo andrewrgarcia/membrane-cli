@@ -78,7 +78,7 @@ You decide what matters. Membrane just remembers it.
 
 ```bash
 cargo install membrane-cli
-````
+```
 
 This installs the `me` command.
 
