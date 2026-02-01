@@ -54,7 +54,7 @@ pub fn run(old: &str, new: &str, project_filter: Option<&str>) -> Result<()> {
             );
         }
 
-        let value = project.remove(old).unwrap();
+        let value = project.shift_remove(old).unwrap();
         project.insert(new.to_string(), value);
 
         project.insert(

@@ -4,6 +4,7 @@ use std::io::{self, Read};
 use std::path::Path;
 
 use serde_yaml::Value;
+use indexmap::IndexMap;
 
 use crate::core::Project;
 use crate::memfs;
@@ -71,11 +72,11 @@ fn push_from_stdin(as_name: Option<&str>) -> Result<()> {
 }
 
 // ------------------------------
-// Core push logic (single source of truth)
+// Core push logic
 // ------------------------------
 
 fn push_project(
-    mut data: Project,
+    data: Project,
     project_name: &str,
     source: &str,
 ) -> Result<()> {
@@ -90,22 +91,50 @@ fn push_project(
         );
     }
 
-    if !data.contains_key("_id") {
-        data.insert(
-            "_id".to_string(),
-            Value::String(uuid::Uuid::new_v4().to_string()),
-        );
-    }
+    // Canonicalize BEFORE writing
+    let ordered = canonicalize_project(data, project_name);
 
-    // --- inject metadata
-    let now = now_iso();
-    data.insert("_created".to_string(), Value::String(now.clone()));
-    data.insert("_updated".to_string(), Value::String(now));
-
-    fs::write(&dest, serde_yaml::to_string(&data)?)?;
+    fs::write(&dest, serde_yaml::to_string(&ordered)?)?;
 
     println!("✔ pushed {} → project `{}`", source, project_name);
     Ok(())
+}
+
+// ------------------------------------------------------------
+// Canonical Project Writer
+// ------------------------------------------------------------
+
+fn canonicalize_project(
+    mut data: Project,
+    project_name: &str,
+) -> Project {
+    let mut ordered: Project = IndexMap::new();
+
+    // ----- extract metadata safely
+    let id = data
+        .shift_remove("_id")
+        .unwrap_or(Value::String(uuid::Uuid::new_v4().to_string()));
+
+    let created = data
+        .shift_remove("_created")
+        .unwrap_or(Value::String(now_iso()));
+
+    let now = now_iso();
+
+    // ----- PIN metadata FIRST
+    ordered.insert("_id".into(), id);
+    ordered.insert("name".into(), Value::String(project_name.to_string()));
+    ordered.insert("_created".into(), created);
+    ordered.insert("_updated".into(), Value::String(now));
+
+    // ----- preserve user key order
+    for (k, v) in data {
+        if !k.starts_with('_') && k != "name" {
+            ordered.insert(k, v);
+        }
+    }
+
+    ordered
 }
 
 // ------------------------------

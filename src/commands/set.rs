@@ -5,11 +5,16 @@ use crate::core::Project;
 use crate::memfs;
 use crate::utils::{
     parse::parse_scalar,
-    time::now_iso,
     input::read_multiline,
+    project_writer::{canonicalize_project, write_project}
 };
 
 pub fn run(project: &str, key: &str, value: Option<&str>) -> Result<()> {
+    // guard reserved keys EARLY
+    if key.starts_with('_') {
+        anyhow::bail!("Keys starting with '_' are reserved metadata keys.");
+    }
+
     let root = memfs::resolve_workspace_root()?;
     let path = memfs::projects_dir(&root).join(format!("{project}.yaml"));
 
@@ -33,12 +38,10 @@ pub fn run(project: &str, key: &str, value: Option<&str>) -> Result<()> {
     };
 
     data.insert(key.to_string(), yaml_value);
-    data.insert(
-        "_updated".to_string(),
-        serde_yaml::Value::String(now_iso()),
-    );
+    let ordered = canonicalize_project(data, project)?;
+    write_project(&path, ordered)?;
 
-    fs::write(&path, serde_yaml::to_string(&data)?)?;
+
     println!("Set `{key}` on `{project}`");
 
     Ok(())

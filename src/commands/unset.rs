@@ -3,7 +3,8 @@ use std::fs;
 
 use crate::core::Project;
 use crate::memfs;
-use crate::utils::time::now_iso;
+use crate::utils::project_writer::{canonicalize_project, write_project};
+
 
 /// Remove a key from a project
 pub fn run(project: &str, key: &str) -> Result<()> {
@@ -21,17 +22,14 @@ pub fn run(project: &str, key: &str) -> Result<()> {
     let content = fs::read_to_string(&path)?;
     let mut data: Project = serde_yaml::from_str(&content)?;
 
-    if data.remove(key).is_none() {
+    if data.shift_remove(key).is_none() {
         anyhow::bail!("Key `{}` not found in project `{}`", key, project);
     }
 
     // update timestamp
-    data.insert(
-        "_updated".to_string(),
-        serde_yaml::Value::String(now_iso()),
-    );
+    let ordered = canonicalize_project(data, project)?;
+    write_project(&path, ordered)?;
 
-    fs::write(&path, serde_yaml::to_string(&data)?)?;
 
     println!("✔ removed key `{}` from `{}`", key, project);
     Ok(())

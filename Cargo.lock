@@ -276,6 +276,8 @@ checksum = "7714e70437a7dc3ac8eb7e6f8df75fd8eb422675fc7678aff7364301092b1017"
 dependencies = [
  "equivalent",
  "hashbrown",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -330,7 +332,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "membrane-cli"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -338,6 +340,7 @@ dependencies = [
  "clap",
  "colored",
  "dirs",
+ "indexmap",
  "serde",
  "serde_yaml",
  "uuid",

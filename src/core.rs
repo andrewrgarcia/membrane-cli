@@ -1,7 +1,5 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use serde_yaml::Value;
 
-/// A Membrane project is deliberately schema-less.
-/// Keys are language artifacts, not fields.
-pub type Project = HashMap<String, Value>;
+pub type Project = IndexMap<String, Value>;
 
