@@ -27,10 +27,10 @@ pub fn write_project(path: &Path, project: Project) -> Result<()> {
 
 
 // ------------------------------------------------------------
-// CANONICALIZER (STRUCTURE AUTHORITY)
+// MATERIALIZER (STRUCTURE AUTHORITY)
 // ------------------------------------------------------------
 
-pub fn canonicalize_project(
+pub fn materialize_project(
     mut data: Project,
     project_name: &str,
 ) -> Result<Project> {

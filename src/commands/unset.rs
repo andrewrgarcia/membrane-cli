@@ -3,7 +3,7 @@ use std::fs;
 
 use crate::core::Project;
 use crate::memfs;
-use crate::utils::project_writer::{canonicalize_project, write_project};
+use crate::utils::project_writer::{materialize_project, write_project};
 
 
 /// Remove a key from a project
@@ -27,7 +27,7 @@ pub fn run(project: &str, key: &str) -> Result<()> {
     }
 
     // update timestamp
-    let ordered = canonicalize_project(data, project)?;
+    let ordered = materialize_project(data, project)?;
     write_project(&path, ordered)?;
 
 

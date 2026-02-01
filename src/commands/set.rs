@@ -6,7 +6,7 @@ use crate::memfs;
 use crate::utils::{
     parse::parse_scalar,
     input::read_multiline,
-    project_writer::{canonicalize_project, write_project}
+    project_writer::{materialize_project, write_project}
 };
 
 pub fn run(project: &str, key: &str, value: Option<&str>) -> Result<()> {
@@ -38,7 +38,7 @@ pub fn run(project: &str, key: &str, value: Option<&str>) -> Result<()> {
     };
 
     data.insert(key.to_string(), yaml_value);
-    let ordered = canonicalize_project(data, project)?;
+    let ordered = materialize_project(data, project)?;
     write_project(&path, ordered)?;
 
 

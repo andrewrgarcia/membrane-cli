@@ -91,8 +91,8 @@ fn push_project(
         );
     }
 
-    // Canonicalize BEFORE writing
-    let ordered = canonicalize_project(data, project_name);
+    // Materialize BEFORE writing
+    let ordered = materialize_project(data, project_name);
 
     fs::write(&dest, serde_yaml::to_string(&ordered)?)?;
 
@@ -104,7 +104,7 @@ fn push_project(
 // Canonical Project Writer
 // ------------------------------------------------------------
 
-fn canonicalize_project(
+fn materialize_project(
     mut data: Project,
     project_name: &str,
 ) -> Project {
