@@ -5,6 +5,7 @@ use crate::utils::render::render_key_value;
 use crate::utils::resolve::resolve_project;
 use crate::commands::show_model::ShowContext;
 
+use indexmap::IndexSet;
 use anyhow::Result;
 use colored::Colorize;
 use serde_yaml::Value;
@@ -22,6 +23,7 @@ pub fn run(
     desc: bool,
     printed: bool,
     only: bool,
+    fields: Vec<String>,
 ) -> Result<()> {
     let root = memfs::resolve_workspace_root()?;
     let projects_dir = memfs::projects_dir(&root);
@@ -44,17 +46,37 @@ pub fn run(
         }
     }
 
+    // -----------------------------
+    // Normalize fields
+    // -----------------------------
+
+    let mut set: IndexSet<String> = fields
+        .into_iter()
+        .map(|f| f.trim().to_string())
+        .filter(|f| !f.is_empty())
+        .collect();
+
+    let mut normalized_fields = Vec::new();
+
+    // Always force sort key to be first
+    if let Some(sort) = sort_key {
+        normalized_fields.push(sort.to_string());
+        set.shift_remove(sort); // prevents duplication
+    }
+
+    // Preserve user order exactly
+    normalized_fields.extend(set.into_iter());
+
     let ctx = ShowContext {
         brane_root: root.clone(),
         brane_id,
         sort_key: sort_key.map(|s| s.to_string()),
         projects,
+        fields: normalized_fields,
     };
 
-    // --- CLI output (colored)
     render_cli(&ctx, project)?;
 
-    // --- Markdown output (clean)
     if printed {
         render_markdown(&ctx)?;
     }
@@ -63,9 +85,8 @@ pub fn run(
 }
 
 // ------------------------------------------------------------
-// List projects
+// CLI rendering
 // ------------------------------------------------------------
-
 
 fn render_cli(ctx: &ShowContext, project: Option<&str>) -> Result<()> {
     let short = ctx.brane_id.chars().take(8).collect::<String>();
@@ -83,6 +104,10 @@ fn render_cli(ctx: &ShowContext, project: Option<&str>) -> Result<()> {
     }
 }
 
+// ------------------------------------------------------------
+// LIST VIEW (projection-aware)
+// ------------------------------------------------------------
+
 fn render_list_cli(ctx: &ShowContext) -> Result<()> {
     let header = match &ctx.sort_key {
         Some(k) => format!("=== Projects (sorted by {}) ===", k),
@@ -99,31 +124,43 @@ fn render_list_cli(ctx: &ShowContext) -> Result<()> {
 
         let short_id = id.chars().take(8).collect::<String>();
 
-        if let Some(k) = &ctx.sort_key {
+        print!("• {:<20}", name.bright_white());
+
+        if !ctx.fields.is_empty() {
+            for field in &ctx.fields {
+                let val = project
+                    .get(field)
+                    .and_then(render_inline_value)
+                    .unwrap_or("—".into());
+
+                print!(
+                    " {}: {:<15}",
+                    field.dimmed(),
+                    val.dimmed()
+                );
+            }
+        } else if let Some(k) = &ctx.sort_key {
             let val = project
                 .get(k)
                 .and_then(render_inline_value)
                 .unwrap_or("—".into());
 
-            println!(
-                "• {:<20} {}: {:<20} {}",
-                name.bright_white(),
+            print!(
+                " {}: {:<15}",
                 k.dimmed(),
                 val.dimmed(),
-                format!("[{}]", short_id).dimmed()
-            );
-        } else {
-            println!(
-                "• {:<20} {}",
-                name.bright_white(),
-                format!("[{}]", short_id).dimmed()
             );
         }
+
+        println!(" {}", format!("[{}]", short_id).dimmed());
     }
 
     Ok(())
 }
 
+// ------------------------------------------------------------
+// SINGLE PROJECT VIEW
+// ------------------------------------------------------------
 
 fn render_single_cli(ctx: &ShowContext, input: &str) -> Result<()> {
     let dir = memfs::projects_dir(&ctx.brane_root);
@@ -160,6 +197,10 @@ fn render_single_cli(ctx: &ShowContext, input: &str) -> Result<()> {
     Ok(())
 }
 
+// ------------------------------------------------------------
+// MARKDOWN EXPORT (projection-aware index)
+// ------------------------------------------------------------
+
 fn render_markdown(ctx: &ShowContext) -> Result<()> {
     let mut md = String::new();
     let short = ctx.brane_id.chars().take(8).collect::<String>();
@@ -177,35 +218,32 @@ fn render_markdown(ctx: &ShowContext) -> Result<()> {
 
     md.push_str(&title);
 
-    // --- Index
     for (name, project) in &ctx.projects {
         let id = project
             .get("_id")
             .and_then(|v| v.as_str())
             .unwrap_or("");
+
         let short_id = id.chars().take(8).collect::<String>();
 
-        if let Some(k) = &ctx.sort_key {
-            let val = project
-                .get(k)
-                .and_then(render_inline_value)
-                .unwrap_or("—".into());
+        md.push_str(&format!("• {:<20}", name));
 
-            md.push_str(&format!(
-                "• {:<20} {}: {:<20} [{}]\n",
-                name, k, val, short_id
-            ));
-        } else {
-            md.push_str(&format!(
-                "• {:<20} [{}]\n",
-                name, short_id
-            ));
+        if !ctx.fields.is_empty() {
+            for field in &ctx.fields {
+                let val = project
+                    .get(field)
+                    .and_then(render_inline_value)
+                    .unwrap_or("—".into());
+
+                md.push_str(&format!(" {}: {:<15}", field, val));
+            }
         }
+
+        md.push_str(&format!(" [{}]\n", short_id));
     }
 
     md.push_str("\n---\n\n");
 
-    // --- Full projects
     for (name, project) in &ctx.projects {
         md.push_str(&format!("## {}\n", name));
 
@@ -241,7 +279,6 @@ fn render_markdown(ctx: &ShowContext) -> Result<()> {
 
     Ok(())
 }
-
 
 // ------------------------------------------------------------
 // Helpers

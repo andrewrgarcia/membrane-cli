@@ -57,7 +57,11 @@ enum Commands {
 
         #[arg(long)]
         only: bool,
+
+        #[arg(short = 'f', long = "fields", value_delimiter = ',')]
+        fields: Vec<String>,
     },
+
     Set {
         project: String,
         key: String,
@@ -139,6 +143,7 @@ fn main() -> Result<()> {
             desc,
             printed,
             only,
+            fields,
         } =>
             commands::show::run(
                 project.as_deref(),
@@ -146,6 +151,7 @@ fn main() -> Result<()> {
                 desc,
                 printed,
                 only,
+                fields,
             ),
 
         Commands::Set { project, key, value } =>
